@@ -144,7 +144,7 @@ def main():
 			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["LEFT"])
 
-		elif (pygame.key.get_pressed()[pygame.K_UP] and (chungus.getRect().top) > screen.get_rect().top):
+		if (pygame.key.get_pressed()[pygame.K_UP] and (chungus.getRect().top) > screen.get_rect().top):
 			screen.fill([255, 255, 255])
 			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["TOP"])
