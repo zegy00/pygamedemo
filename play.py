@@ -1,6 +1,6 @@
 import sys, pygame
 
-DIRECTION = {"LEFT": 0, "RIGHT": 1}
+DIRECTION = {"LEFT": 0, "RIGHT": 1, "TOP": 2, "BOTTOM": 3}
 
 
 class Background(pygame.sprite.Sprite):
@@ -40,7 +40,10 @@ class Chungus(pygame.sprite.Sprite):
 		return self.__image
 
 	def getImagePos(self):
-		return pygame.Rect(int((self.__image.get_rect().left) + (self.__colBox.left)) - int(self.__image.get_rect().width/2), int((self.__image.get_rect().top/2) + (self.__colBox.top/2)), self.__image.get_rect().height, self.__image.get_rect().width)
+		return pygame.Rect((int((self.__image.get_rect().left) + (self.__colBox.left)) - int(self.__image.get_rect().width/2)) + int(self.__colBox.width/2), 
+							(int((self.__image.get_rect().top) + (self.__colBox.top)) - int(self.__image.get_rect().height/2)) + int(self.__colBox.height/2),
+							self.__image.get_rect().height,
+							self.__image.get_rect().width)
 
 	def setDir(self, direction):
 		self.__direction = direction
@@ -61,6 +64,12 @@ class Chungus(pygame.sprite.Sprite):
 		elif (direction == DIRECTION["LEFT"]):
 			newPos.left -= self.__speed
 			self.setDir(DIRECTION["LEFT"])
+		elif (direction == DIRECTION["TOP"]):
+			newPos.top -= self.__speed
+			self.setDir(DIRECTION["TOP"])
+		elif (direction == DIRECTION["BOTTOM"]):
+			newPos.bottom += self.__speed
+			self.setDir(DIRECTION["BOTTOM"])
 
 		# uncomment to see the collision box
 		pygame.draw.rect(self._screen, (255, 0, 0), self.__colBox)
@@ -134,6 +143,17 @@ def main():
 			screen.fill([255, 255, 255])
 			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["LEFT"])
+
+		elif (pygame.key.get_pressed()[pygame.K_UP] and (chungus.getRect().top) > screen.get_rect().top):
+			screen.fill([255, 255, 255])
+			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
+			chungus.move(DIRECTION["TOP"])
+
+		elif (pygame.key.get_pressed()[pygame.K_DOWN] and (chungus.getRect().bottom) < screen.get_rect().bottom):
+			screen.fill([255, 255, 255])
+			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
+			chungus.move(DIRECTION["BOTTOM"])
+
 
 
 
