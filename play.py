@@ -1,8 +1,6 @@
 import sys, pygame
 import time
 from threading import Thread
-#from threading import activeCount
-#from threading import Event
 
 IS_GAME_RUNNING = True
 DIRECTION = {"LEFT": 0, "RIGHT": 1, "TOP": 2, "BOTTOM": 3}
@@ -29,21 +27,43 @@ class GameObject(pygame.sprite.Sprite):
 		self._screen = screen
 		self._image = pygame.transform.scale(img, size)
 		self._colBox = pygame.Rect(location[0], location[1], self._screen.get_rect().height, self._screen.get_rect().width)
+		self._imagePos = pygame.Rect(0, 0, self._image.get_rect().height, self._image.get_rect().width)
+		self._speed = 5
 
 	def getRect(self):
 		return self._colBox
 
-	def setRect(self, rect):
-		self._colBox = rect
+	def setLocation(self, left, top):
+		self._colBox.left = left
+		self._colBox.top = top
 
 	def getImage(self):
 		return self._image
 
 	def getImagePos(self):
-		return pygame.Rect((int((self._image.get_rect().left) + (self._colBox.left)) - int(self._image.get_rect().width/2)) + int(self._colBox.width/2), 
-							(int((self._image.get_rect().top) + (self._colBox.top)) - int(self._image.get_rect().height/2)) + int(self._colBox.height/2),
-							self._image.get_rect().height,
-							self._image.get_rect().width)
+		self._imagePos.left = (int((self._image.get_rect().left) + (self._colBox.left)) - int(self._image.get_rect().width/2)) + int(self._colBox.width/2)
+		self._imagePos.top = (int((self._image.get_rect().top) + (self._colBox.top)) - int(self._image.get_rect().height/2)) + int(self._colBox.height/2)
+
+		return self._imagePos
+
+	def getSpeed(self):
+		return self._speed
+
+	def move(self, direction):		
+		newPos = self._colBox
+		if (direction == DIRECTION["RIGHT"]):
+			newPos.right += self._speed
+		elif (direction == DIRECTION["LEFT"]):
+			newPos.left -= self._speed
+		elif (direction == DIRECTION["TOP"]):
+			newPos.top -= self._speed
+		elif (direction == DIRECTION["BOTTOM"]):
+			newPos.bottom += self._speed
+
+		# uncomment to see the collision box
+		#pygame.draw.rect(self._screen, (255, 0, 0), newPos)
+		
+		self._screen.blit(self._image, self.getImagePos())
 
 
 class Bullet(GameObject):
@@ -54,10 +74,10 @@ class Bullet(GameObject):
 		self._screen = screen
 		self._image = pygame.transform.scale(img, (int(size[0]//4), int(size[1]//4)))
 		self._colBox = pygame.Rect(location[0], location[1], int(self._screen.get_rect().height//16), int(self._screen.get_rect().width//16))
-		self._speed = 10
+		self._speed = 4
 
-	def getSpeed(self):
-		return self._speed
+	def getBulletToDraw(self):
+		return (self.getImage(), self.getImagePos())
 
 
 class Bullets(Thread):
@@ -66,29 +86,36 @@ class Bullets(Thread):
 		self._image = imageFile
 		self._screen = screen
 		self._player = player
-
-	def getSpeed(self):
-		return self._speed
+		self._bullets = deque([])
+		location = self._player.getRect()
+		bullet = Bullet(self._image, location, self._screen)
+		self._bulletsToDraw = [bullet] * 1000
 
 	def run(self):
 		global IS_GAME_RUNNING
 
 		while(IS_GAME_RUNNING):
-			if (pygame.key.get_pressed()[pygame.K_SPACE]):
-				location = self._player.getRect()
-				bullet = Bullet(self._image, location, self._screen)
-				while(bullet.getRect().bottom > self._screen.get_rect().top):
-					print("FIRE!")
-					newPos = bullet.getRect()
-					#newPos.left = (int((self._image.get_rect().left) + (self._colBox.left)) - int(self._image.get_rect().width/2)) + int(self._colBox.width/2)
-					newPos.top -= bullet.getSpeed()
+			try:
+				numBullets = 0
+				if (pygame.key.get_pressed()[pygame.K_SPACE]):
+					numBullets += 1
 
-					# uncomment to see the collision box
-					#pygame.draw.rect(self._screen, (255, 0, 0), newPos)
-		
-					self._screen.blit(bullet.getImage(), bullet.getImagePos())
+					location = self._player.getRect()
+					self._bulletsToDraw[numBullets].setLocation(location[0], location[1])
+					while(numBullets):
 
-					#time.sleep(150)
+						for bulletsIndx in range(numBullets):
+							if (self._bulletsToDraw[bulletsIndx].getRect().bottom > self._screen.get_rect().top):
+								self._bulletsToDraw[bulletsIndx].move(DIRECTION["TOP"])
+							else :
+								del self._bulletsToDraw[bulletsIndx]
+								numBullets -= 1	
+					
+						self._screen.blits(blit_sequence=[self._bulletsToDraw[i].getBulletToDraw() for i in range(numBullets)])
+			except Exception as ex:
+				print(ex.args)
+				sys.exit(0)
+						
 
 
 class Player(GameObject):
@@ -99,32 +126,9 @@ class Player(GameObject):
 		self._screen = screen
 		self._image = pygame.transform.scale(img, (int(size[0]//4), int(size[1]//4)))
 		self._colBox = pygame.Rect(location[0], location[1], int(self._screen.get_rect().height//6), int(self._screen.get_rect().width//4))
-		self.__speed = 5
+		self._speed = 5
 		self._bullets = Bullets('resources/sprites/bullet01.png', self._screen, self)
 		self._bullets.start()
-
-	def getSpeed(self):
-		return self.__speed
-
-	def getDir(self):
-		return self.__direction
-
-	def move(self, direction):		
-		newPos = self._colBox
-		if (direction == DIRECTION["RIGHT"]):
-			newPos.right += self.__speed
-		elif (direction == DIRECTION["LEFT"]):
-			newPos.left -= self.__speed
-		elif (direction == DIRECTION["TOP"]):
-			newPos.top -= self.__speed
-		elif (direction == DIRECTION["BOTTOM"]):
-			newPos.bottom += self.__speed
-
-		# uncomment to see the collision box
-		#pygame.draw.rect(self._screen, (255, 0, 0), newPos)
-		
-		self._screen.blit(self._image, self.getImagePos())
-		pygame.display.update()
 
 
 def main():
@@ -156,23 +160,15 @@ def main():
 				IS_GAME_RUNNING = False
 		
 		if (pygame.key.get_pressed()[pygame.K_RIGHT] and (chungus.getRect().right) < screen.get_rect().right):
-			screen.fill([255, 255, 255])
-			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["RIGHT"])
 
 		elif (pygame.key.get_pressed()[pygame.K_LEFT] and (chungus.getRect().left) > screen.get_rect().left):
-			screen.fill([255, 255, 255])
-			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["LEFT"])
 
 		if (pygame.key.get_pressed()[pygame.K_UP] and (chungus.getRect().top) > screen.get_rect().top):
-			screen.fill([255, 255, 255])
-			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["TOP"])
 
 		elif (pygame.key.get_pressed()[pygame.K_DOWN] and (chungus.getRect().bottom) < screen.get_rect().bottom):
-			screen.fill([255, 255, 255])
-			screen.blit(backgroundTropicalBeach.getImage(), backgroundTropicalBeach.getRect())
 			chungus.move(DIRECTION["BOTTOM"])
 
 	sys.exit(0)
