@@ -20,7 +20,7 @@ class Node:
 	def getValue(self):
 		return self._dataval
 
-class GameObject(pygame.sprite.Sprite):
+class DynamicObject(pygame.sprite.Sprite):
 	def __init__(self, imageFile, location, screen):
 		pygame.sprite.Sprite.__init__(self)
 		img = pygame.image.load(imageFile)
@@ -63,9 +63,9 @@ class GameObject(pygame.sprite.Sprite):
 		return (int(size[0] / divider)), int((size[1] / divider))
 
 
-class Background(GameObject):
+class Background(DynamicObject):
 	def __init__(self, imageFile, location, screen):
-		GameObject.__init__(self, imageFile, location, screen)
+		DynamicObject.__init__(self, imageFile, location, screen)
 		self._speed = 2
 
 	def move(self, direction):		
@@ -84,9 +84,9 @@ class Background(GameObject):
 		self._screen.blit(self._image, self._colBox)
 
 
-class Bullet(GameObject):
+class Bullet(DynamicObject):
 	def __init__(self, imageFile, location, screen):
-		GameObject.__init__(self, imageFile, location, screen)
+		DynamicObject.__init__(self, imageFile, location, screen)
 		img = pygame.image.load(imageFile)
 		size = img.get_size()
 		self._screen = screen
@@ -95,7 +95,7 @@ class Bullet(GameObject):
 		self._colBox.left, self._colBox.top = location.centerx, location.centery
 		self._colBox.height = scaledSize[0]
 		self._colBox.width = scaledSize[1]
-		self._speed = 4
+		self._speed = 3
 
 	def getBulletToDraw(self):
 		return (self.getImage(), self._colBox)
@@ -135,12 +135,70 @@ class Bullets(Thread):
 			except Exception as ex:
 				print(ex.args)
 				sys.exit(0)
+
+class Health():
+	def __init__(self, health):
+		self._health = health
+		self._currentHealth = health
+
+	def decreaseHealth(self, healthPoints):
+		if(isinstance(healthPoints, int) and (healthPoints > 0 and healthPoints < 10000)):
+			self._currentHealth -= healthPoints
+			if self._currentHealth < 0:
+				self._currentHealth = 0
+		else:
+			print("Health points should be of integer type and in range 0-10000")
+
+	def increaseHealth(self, healthPoints):
+		if(isinstance(healthPoints, int) and (healthPoints > 0 and healthPoints < 10000)):
+			self._currentHealth += healthPoints 
+			if self._currentHealth > self._health:
+				self._currentHealth = self._health
+		else:
+			print("Health points should be of integer type and in range 0-10000")
+
+	def getHealth(self):
+		return self._health
+
+	def getCurrentHealth(self):
+		return self._currentHealth
+
+	def getCurrentHpPercentage(self):
+		return (self._currentHealth * 100) / self._health
 						
+class HealthBar(pygame.sprite.Sprite):
+	def __init__(self, imageFile, location, surface, player):
+		pygame.sprite.Sprite.__init__(self)
+		img = pygame.image.load(imageFile)
+		size = img.get_size()
+		self._image = pygame.transform.scale(img, self._scale(size, 4))
+		self._rect = self._image.get_rect()
+		self._rectWidthMax = self._rect.width
+		self._rect.left, self._rect.top = location[0], location[1]
+		self._surface = surface
+		self._color = (237, 41, 57)
+		self._player = player
+
+	def _getRectanglePercentage(self):
+		curHpPercentage = self._player.getCurrentHpPercentage()
+		return (curHpPercentage / 100) * self._rectWidthMax
+
+	def __adjustHealthBar(self):
+		self._rect.width = int(self._getRectanglePercentage())
+
+	def _scale(self, size, divider):
+		return (int(size[0] / divider)), int((size[1] / divider))
+
+	def drawHealthBar(self):
+		self.__adjustHealthBar()
+		pygame.draw.ellipse(self._surface, self._color, self._rect)
+		self._surface.blit(self._image, self._rect)
 
 
-class Player(GameObject):
-	def __init__(self, imageFile, location, screen):
-		GameObject.__init__(self, imageFile, location, screen)
+class Player(DynamicObject, Health):
+	def __init__(self, imageFile, location, screen, health):
+		DynamicObject.__init__(self, imageFile, location, screen)
+		Health.__init__(self, health)
 		img = pygame.image.load(imageFile)
 		size = img.get_size()
 		self._screen = screen
@@ -169,19 +227,21 @@ def main():
 	nodeBackground01.setNext(nodeBackground02)
 	nodeBackground02.setNext(nodeBackground01)
 
-	startPoint = [0, 200]
-	mainPlayer = Player('resources/sprites/chungus.png', startPoint, screen)
+	startPoint = [400, 200]
+	mainPlayer = Player('resources/sprites/chungus.png', startPoint, screen, 100)
+	mainPlayerHealthBar = HealthBar('resources/sprites/health_bar.png', [15, 15], screen, mainPlayer)
 
 	backgroundNode = nodeBackground01
 	nextBackgroundNode = nodeBackground01.next()
 	background = backgroundNode.getValue()
 	nextBackground = nextBackgroundNode.getValue()
 	background.setLocation(0, 0)
-	nextBackground.setLocation(0, -screen.get_height())	
+	nextBackground.setLocation(0, -screen.get_height())
 
 	while(IS_GAME_RUNNING):
 
 		screen.blit(mainPlayer.getImage(), mainPlayer.getRect())
+		mainPlayerHealthBar.drawHealthBar()
 		# uncomment to see the collision box
 		#pygame.draw.rect(screen, (255, 0, 0), mainPlayer.getRect())
 		pygame.display.update()
