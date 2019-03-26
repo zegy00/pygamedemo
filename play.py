@@ -20,7 +20,7 @@ class Node:
 	def getValue(self):
 		return self._dataval
 
-class DynamicObject(pygame.sprite.Sprite):
+class GameObject(pygame.sprite.Sprite):
 	def __init__(self, imageFile, location, screen):
 		pygame.sprite.Sprite.__init__(self)
 		img = pygame.image.load(imageFile)
@@ -29,7 +29,6 @@ class DynamicObject(pygame.sprite.Sprite):
 		self._image = pygame.transform.scale(img, size)
 		self._colBox = self._image.get_rect()
 		self._colBox.left, self._colBox.top = location[0], location[1]
-		self._speed = 5
 
 	def getRect(self):
 		return self._colBox
@@ -40,6 +39,11 @@ class DynamicObject(pygame.sprite.Sprite):
 
 	def getImage(self):
 		return self._image
+
+class DynamicGameObject(GameObject):
+	def __init__(self, imageFile, location, screen):
+		GameObject.__init__(self, imageFile, location, screen)
+		self._speed = 5
 
 	def getSpeed(self):
 		return self._speed
@@ -63,9 +67,9 @@ class DynamicObject(pygame.sprite.Sprite):
 		return (int(size[0] / divider)), int((size[1] / divider))
 
 
-class Background(DynamicObject):
+class Background(DynamicGameObject):
 	def __init__(self, imageFile, location, screen):
-		DynamicObject.__init__(self, imageFile, location, screen)
+		DynamicGameObject.__init__(self, imageFile, location, screen)
 		self._speed = 2
 
 	def move(self, direction):		
@@ -84,9 +88,9 @@ class Background(DynamicObject):
 		self._screen.blit(self._image, self._colBox)
 
 
-class Bullet(DynamicObject):
+class Bullet(DynamicGameObject):
 	def __init__(self, imageFile, location, screen):
-		DynamicObject.__init__(self, imageFile, location, screen)
+		DynamicGameObject.__init__(self, imageFile, location, screen)
 		img = pygame.image.load(imageFile)
 		size = img.get_size()
 		self._screen = screen
@@ -195,9 +199,9 @@ class HealthBar(pygame.sprite.Sprite):
 		self._surface.blit(self._image, self._rect)
 
 
-class Player(DynamicObject, Health):
+class Player(DynamicGameObject, Health):
 	def __init__(self, imageFile, location, screen, health):
-		DynamicObject.__init__(self, imageFile, location, screen)
+		DynamicGameObject.__init__(self, imageFile, location, screen)
 		Health.__init__(self, health)
 		img = pygame.image.load(imageFile)
 		size = img.get_size()
