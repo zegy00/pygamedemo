@@ -1,10 +1,10 @@
 import sys
 import pygame
+import ctypes
 from threading import Thread
 
 IS_GAME_RUNNING = True
 DIRECTION = {"LEFT": 0, "RIGHT": 1, "TOP": 2, "BOTTOM": 3}
-screenHeight, screenWidth = 1024, 1024
 
 
 class Node:
@@ -20,22 +20,6 @@ class Node:
 
     def get_value(self):
         return self._dataval
-
-
-class Vec2:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __add__(self, other):
-        new_x = self.x + other.x
-        new_y = self.y + other.y
-        return Vec2(new_x, new_y)
-
-    def __iadd__(self, other):
-        self.x += other.x
-        self.y += other.y
-        return self
 
 
 class GameObject(pygame.sprite.Sprite):
@@ -88,6 +72,9 @@ class DynamicGameObject(GameObject):
 class Background(DynamicGameObject):
     def __init__(self, image_file, surface):
         DynamicGameObject.__init__(self, image_file, surface)
+        scaled_size = surface.get_size()
+        self._image = pygame.transform.scale(self._img, scaled_size)
+        self._rect.size = scaled_size
         self._speed = 2
 
     def move(self, direction):
@@ -134,7 +121,7 @@ class Railgun(Weapon):
         location = self._owner.get_rect()
         bullet.set_location(location.centerx, location.top)
         surface = self._owner.get_surface()
-        while surface.get_rect().contains(bullet.get_rect()):
+        while surface.get_rect().top < bullet.get_rect().bottom:
             bullet.move(direction)
             surface.blit(bullet.get_image(), bullet.get_rect())
             pygame.time.wait(9)
@@ -237,23 +224,33 @@ class Player(DynamicGameObject, Destructible):
 def main():
     pygame.init()
 
-    global IS_GAME_RUNNING, screenHeight, screenWidth
+    global IS_GAME_RUNNING
 
-    screen = pygame.display.set_mode((screenHeight, screenWidth))
+    screen_width, screen_height = 1360, 768
+    user32 = ctypes.windll.user32
+    user32.SetProcessDPIAware()
+
+    if screen_width > 1920 and screen_height > 1080:
+        screen_width, screen_height = 1920, 1080
+    elif screen_width < 800 and screen_height < 600:
+        print("Your screen resolution is too low")
+        sys.exit(0)
+
+    screen = pygame.display.set_mode((screen_width, screen_height))
 
     pygame.display.set_caption("Small py game demo")
 
     background01 = Background('resources/sprites/background_space01.jpg', screen)
     background01.set_location(0, 0)
     background02 = Background('resources/sprites/background_space02.jpg', screen)
-    background02.set_location(0, screenHeight)
+    background02.set_location(0, screen_height)
 
     node_background01 = Node(background01)
     node_background02 = Node(background02)
     node_background01.set_next(node_background02)
     node_background02.set_next(node_background01)
 
-    start_point = [400, 200]
+    start_point = [screen.get_rect().centerx, screen.get_rect().centery]
     main_player = Player('resources/sprites/chungus.png', screen, 100)
     main_player.set_location(start_point[0], start_point[1])
     main_player_health_bar = HealthBar('resources/sprites/health_bar.png', screen, main_player)
@@ -267,9 +264,8 @@ def main():
     next_background.set_location(0, -screen.get_height())
 
     while IS_GAME_RUNNING:
-
-        screen.blit(main_player.get_image(), main_player.get_rect())
         main_player_health_bar.draw_health_bar()
+        screen.blit(main_player.get_image(), main_player.get_rect())
         pygame.display.update()
 
         for event in pygame.event.get():
