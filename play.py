@@ -49,9 +49,9 @@ class GameObject(pygame.sprite.Sprite):
 
 
 class DynamicGameObject(GameObject):
-    def __init__(self, image_file, screen):
-        GameObject.__init__(self, image_file, screen)
-        self._speed = 5
+    def __init__(self, image_file, surface, speed):
+        GameObject.__init__(self, image_file, surface)
+        self._speed = speed
 
     def get_speed(self):
         return self._speed
@@ -71,11 +71,10 @@ class DynamicGameObject(GameObject):
 
 class Background(DynamicGameObject):
     def __init__(self, image_file, surface):
-        DynamicGameObject.__init__(self, image_file, surface)
+        DynamicGameObject.__init__(self, image_file, surface, speed=2)
         scaled_size = surface.get_size()
         self._image = pygame.transform.scale(self._img, scaled_size)
         self._rect.size = scaled_size
-        self._speed = 2
 
     def move(self, direction):
         if direction == DIRECTION["RIGHT"]:
@@ -92,14 +91,10 @@ class Background(DynamicGameObject):
 
 class Bullet(DynamicGameObject):
     def __init__(self, image_file, surface, speed):
-        DynamicGameObject.__init__(self, image_file, surface)
-        scaled_size = self._scale(self._size, 5)
+        DynamicGameObject.__init__(self, image_file, surface, speed)
+        scaled_size = self._scale(self._size, 8)
         self._image = pygame.transform.scale(self._img, scaled_size)
         self._rect.size = scaled_size
-        self._speed = speed
-
-    def get_bullet_to_draw(self):
-        return (self.get_image(), self._rect)
 
 
 class Weapon:
@@ -119,22 +114,37 @@ class Railgun(Weapon):
     def shoot(self, direction):
         bullet = self._round.pop()
         location = self._owner.get_rect()
-        bullet.set_location(location.centerx, location.top)
+        bullet.set_location(location.centerx, location.centery)
         surface = self._owner.get_surface()
-        while surface.get_rect().top < bullet.get_rect().bottom:
-            bullet.move(direction)
-            surface.blit(bullet.get_image(), bullet.get_rect())
-            pygame.time.wait(9)
+        targets = self._owner.get_targets()
+        damage = self._owner.get_damage()
+
+        if type(self._owner).__name__ == "Player":
+            while surface.get_rect().top < bullet.get_rect().bottom:
+                bullet.move(direction)
+                surface.blit(bullet.get_image(), bullet.get_rect())
+                for enemy, enemy_rect in targets.items():
+                    if bullet.get_rect().colliderect(enemy_rect):
+                        enemy.decrease_health(damage)
+                pygame.time.wait(9)
+        else:
+            while surface.get_rect().bottom > bullet.get_rect().top:
+                bullet.move(direction)
+                surface.blit(bullet.get_image(), bullet.get_rect())
+                for enemy, enemy_rect in targets.items():
+                    if bullet.get_rect().colliderect(enemy_rect):
+                        enemy.decrease_health(damage)
+                pygame.time.wait(9)
 
 
-class Arsenal(Thread):
-    def __init__(self, weapon, direction):
+class Offensive(Thread):
+    def __init__(self, weapon, damage, fire_direction):
         Thread.__init__(self)
         self._current_weapon = weapon
-        self._weapons = []
-        self._fire_direction = direction
-        self.add_weapon(weapon)
-        self.set_fire_direction(direction)
+        self._weapons = [weapon]
+        self._fire_direction = fire_direction
+        self._targets = {}
+        self._damage = damage
 
     def set_fire_direction(self, direction):
         self._fire_direction = direction
@@ -145,12 +155,31 @@ class Arsenal(Thread):
     def switch_weapon(self, weapon):
         self._current_weapon = weapon
 
+    def add_targets(self, targets):
+        self._targets.update(zip(targets, [target.get_rect() for target in targets]))
+
+    def add_target(self, target):
+        target_dict = {target: target.get_rect()}
+        self._targets.update(target_dict)
+
+    def get_targets(self):
+        return self._targets
+
+    def get_damage(self):
+        return self._damage
+
     def run(self):
         global IS_GAME_RUNNING
 
-        while IS_GAME_RUNNING:
-            if pygame.key.get_pressed()[pygame.K_SPACE]:
-                self._current_weapon.shoot(self._fire_direction)
+        print(str(self._current_weapon))
+
+        if type(self).__name__ == "Player":
+            while IS_GAME_RUNNING:
+                if pygame.key.get_pressed()[pygame.K_SPACE]:
+                    self._current_weapon.shoot(self._fire_direction)
+        else:
+            while IS_GAME_RUNNING:
+                    self._current_weapon.shoot(self._fire_direction)
 
 
 class Destructible:
@@ -207,18 +236,35 @@ class HealthBar(GameObject):
         self._surface.blit(self._image, self._rect)
 
 
-class Player(DynamicGameObject, Destructible):
-    def __init__(self, image_file, surface, health):
-        DynamicGameObject.__init__(self, image_file, surface)
-        Destructible.__init__(self, health)
+class Actor(DynamicGameObject, Destructible, Offensive):
+    def __init__(self, image_file, surface, health, damage, fire_direction, speed, weapon):
+        DynamicGameObject.__init__(self, image_file=image_file, surface=surface, speed=speed)
+        Destructible.__init__(self, health=health)
+        Offensive.__init__(self, damage=damage, fire_direction=fire_direction, weapon=weapon)
+
+
+class Player(Actor):
+    def __init__(self, surface):
+        image_file = 'resources/sprites/bear.png'
+        bullet = Bullet('resources/sprites/bullet02.png', surface, 60)
+        railgun = Railgun(bullet, 100000, self)
+        Actor.__init__(self, image_file=image_file, surface=surface, health=100, damage=5,
+                       fire_direction=DIRECTION["TOP"], speed=8, weapon=railgun)
         scaled_size = self._scale(self._size, 2)
         self._image = pygame.transform.scale(self._img, scaled_size)
         self._rect.size = scaled_size
-        self._speed = 8
-        bullet = Bullet('resources/sprites/bullet02.png', self._surface, 60)
+
+
+class Enemy(Actor):
+    def __init__(self, surface):
+        image_file = 'resources/sprites/chungus.jpg'
+        bullet = Bullet('resources/sprites/enemy_bullet01.png', surface, 60)
         railgun = Railgun(bullet, 100000, self)
-        self._arsenal = Arsenal(railgun, DIRECTION["TOP"])
-        self._arsenal.start()
+        Actor.__init__(self, image_file=image_file, surface=surface, health=80, damage=1,
+                       fire_direction=DIRECTION["BOTTOM"], speed=6, weapon=railgun)
+        scaled_size = self._scale(self._size, 6)
+        self._image = pygame.transform.scale(self._img, scaled_size)
+        self._rect.size = scaled_size
 
 
 def main():
@@ -226,7 +272,7 @@ def main():
 
     global IS_GAME_RUNNING
 
-    screen_width, screen_height = 1360, 768
+    screen_width, screen_height = 1280, 720
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()
 
@@ -251,10 +297,19 @@ def main():
     node_background02.set_next(node_background01)
 
     start_point = [screen.get_rect().centerx, screen.get_rect().centery]
-    main_player = Player('resources/sprites/chungus.png', screen, 100)
+    main_player = Player(screen)
     main_player.set_location(start_point[0], start_point[1])
+    main_player.start()
     main_player_health_bar = HealthBar('resources/sprites/health_bar.png', screen, main_player)
     main_player_health_bar.set_location(15, 15)
+
+    enemy_start_point = [screen.get_rect().centerx, screen.get_rect().top]
+    enemy = Enemy(screen)
+    enemy.set_location(enemy_start_point[0], enemy_start_point[1])
+    enemy.start()
+
+    main_player.add_target(enemy)
+    enemy.add_target(main_player)
 
     background_node = node_background01
     next_background_node = node_background01.next()
@@ -266,6 +321,7 @@ def main():
     while IS_GAME_RUNNING:
         main_player_health_bar.draw_health_bar()
         screen.blit(main_player.get_image(), main_player.get_rect())
+        screen.blit(enemy.get_image(), enemy.get_rect())
         pygame.display.update()
 
         for event in pygame.event.get():
