@@ -11,10 +11,16 @@ class GameObject(pygame.sprite.Sprite):
         self._rect = self._image.get_rect()
 
     def _scale(self, size, divider):
+        if size[0] < 0 or size[1] < 0:
+            print("Size should be a positive number")
+            return -1
         return (int(size[0] / divider)), int((size[1] / divider))
 
     def get_rect(self):
         return self._rect
+
+    def set_rect(self, rect):
+        self._rect = rect
 
     def set_location(self, left, top):
         self._rect.left = left
